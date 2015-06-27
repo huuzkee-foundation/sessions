@@ -1,23 +1,39 @@
-import "github.com/gorilla/sessions"
+package main
 
-var store = sessions.NewCookieStore([]byte("33446a9dcf9ea060a0a6532b166da32f304af0de"))
+import (
+  "fmt"
+  "github.com/gorilla/sessions"
+  "net/http"
+)
 
-func Handler(w http.ResponseWriter, r *http.Request){
-    session, _ := store.Get(r, "session-name")
-
-    session.Values["foo"] = "bar"
-    session.Values[42] = 43
-    session.Save(r, w)
-
-    fmt.Fprint(w, "Hello world :)")
+func main() {
+  http.HandleFunc("/set", set)
+  http.HandleFunc("/get", get)
+  fmt.Println("Listening...")
+  http.ListenAndServe(":3000", nil)
 }
 
-func main(){
-    store.Options = &sessions.Options{
-        Domain:     "localhost",
-        Path:       "/",
-        MaxAge:     60 * 15,
-        Secure:     false,
-        HttpOnly:   true,
-    }
+var store = sessions.NewCookieStore([]byte("a-secret-string"))
+
+func set(w http.ResponseWriter, r *http.Request) {
+  session, err := store.Get(r, "flash-session")
+  if err != nil {
+    http.Error(w, err.Error(), http.StatusInternalServerError)
+  }
+  session.AddFlash("This is a flashed message!", "message")
+  session.Save(r, w)
+}
+
+func get(w http.ResponseWriter, r *http.Request) {
+  session, err := store.Get(r, "flash-session")
+  if err != nil {
+    http.Error(w, err.Error(), http.StatusInternalServerError)
+  }
+  fm := session.Flashes("message")
+  if fm == nil {
+    fmt.Fprint(w, "No flash messages")
+    return
+  }
+  session.Save(r, w)
+  fmt.Fprintf(w, "%v", fm[0])
 }
